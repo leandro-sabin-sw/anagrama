@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -14,6 +15,8 @@ import java.util.stream.IntStream;
 @Getter
 @Slf4j
 public class AnagramGenerator {
+
+  private static final Integer INVALID_INDEX = -1;
 
   private final String originalString;
 
@@ -29,13 +32,10 @@ public class AnagramGenerator {
         .toList();
 
     List<Integer> indexes = IntStream.range(0, originalString.length()).boxed().toList();
-    List<Integer> shuffledIndexes = new ArrayList<>(indexes);
-    Collections.shuffle(shuffledIndexes);
 
-    Map<Integer, Integer> mapping = indexes.stream()
-        .collect(Collectors.toMap(Function.identity(), index -> getShuffledIndex(index, shuffledIndexes)));
+    Map<Integer, Integer> indexMapping = createIndexMapping(indexes);
 
-    String anagram = mapping.values().stream()
+    String anagram = indexMapping.values().stream()
         .map(originalChars::get)
         .collect(Collectors.joining());
 
@@ -44,15 +44,34 @@ public class AnagramGenerator {
     return anagram;
   }
 
+  private Map<Integer, Integer> createIndexMapping(List<Integer> originalStringIndexes) {
+    List<Integer> shuffledIndexes = new ArrayList<>(originalStringIndexes);
+    Collections.shuffle(shuffledIndexes);
+
+    Map<Integer, Integer> mapping = originalStringIndexes.stream()
+        .collect(Collectors.toMap(Function.identity(), index -> getShuffledIndex(index, shuffledIndexes)));
+
+    boolean invalidIndexFound = mapping.values().stream()
+        .anyMatch(INVALID_INDEX::equals);
+
+    if (invalidIndexFound) {
+      return createIndexMapping(originalStringIndexes);
+    } else {
+      return mapping;
+    }
+  }
+
   private Integer getShuffledIndex(Integer originalIndex, List<Integer> shuffledIndexes) {
-      Integer candidate = shuffledIndexes.get(0);
-      if (originalIndex.equals(candidate) && shuffledIndexes.size() > 1) {
-        candidate = shuffledIndexes.get(1);
+      Optional<Integer> candidateIndex = shuffledIndexes.stream()
+          .filter(index -> !originalIndex.equals(index))
+          .findAny();
+
+      if (candidateIndex.isEmpty()) {
+        return INVALID_INDEX;
+      } else {
+        shuffledIndexes.remove(candidateIndex.get());
+        return candidateIndex.get();
       }
-
-      shuffledIndexes.remove(candidate);
-
-      return candidate;
   }
 
 
